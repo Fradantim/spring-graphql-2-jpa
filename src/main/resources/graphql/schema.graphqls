@@ -1,0 +1,22 @@
+type Query {
+    findBookById(id: ID): Book
+}
+
+type Book {
+    id: ID!
+    name: String
+    isbn: String
+    author: Author
+    reviewers: [Author]
+    quotes: [Quote]
+}
+
+type Author {
+    id: ID!
+    name: String!
+}
+
+type Quote {
+    id: ID!
+    text: String
+}
