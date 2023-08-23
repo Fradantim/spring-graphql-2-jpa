@@ -105,10 +105,10 @@ JPQL:
 select 
 	c1_0.id,c1_0.name,
 	q1_0.book_id,q1_0.id,
-	r1_0.author_id,r1_1.id,r1_1.name
+	r1_0.person_id,r1_1.id,r1_1.name
 	from book c1_0 
 	left join quote q1_0 on c1_0.id=q1_0.book_id 
-	left join (book_reviewer r1_0 join person r1_1 on r1_1.id=r1_0.book_id) on c1_0.id=r1_0.author_id
+	left join (book_reviewer r1_0 join person r1_1 on r1_1.id=r1_0.book_id) on c1_0.id=r1_0.person_id
 	where c1_0.id=?
 ```
 
