@@ -138,7 +138,7 @@ and we only ask for lastName a new class will be created:
 
 Why is the `@Id` annotated field kept? -> Because it's a mandatory field for an entity.
 
-This is also done on transitive classes (`@OneToOne` / `@OneToMany` / `@ManyToOne` / `@ManyToMany`).
+This class reduction is also done on transitive classes (`@OneToOne` / `@OneToMany` / `@ManyToOne` / `@ManyToMany`), if they are selected on the request.
 
 This way the `EntityManager` can reduce the selected columns when performing a query.
 
