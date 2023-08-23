@@ -27,7 +27,7 @@ public class Book {
 	@OneToMany(fetch = FetchType.EAGER)
 	private Set<Quote> quotes;
 
-	@JoinTable(name = "book_reviewer", joinColumns = @JoinColumn(name = "author_id"), inverseJoinColumns = @JoinColumn(name = "book_id"))
+	@JoinTable(name = "book_reviewer", joinColumns = @JoinColumn(name = "person_id"), inverseJoinColumns = @JoinColumn(name = "book_id"))
 	@ManyToMany(fetch = FetchType.EAGER)
 	private Set<Person> reviewers;
 

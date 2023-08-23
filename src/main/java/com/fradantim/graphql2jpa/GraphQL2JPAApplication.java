@@ -42,13 +42,13 @@ public class GraphQL2JPAApplication implements CommandLineRunner {
 		logger.info("Creating tables...");
 		List.of("create table person (id int not null, name varchar(31), primary key (id))",
 				"create table book (author_id bigint, id int not null, isbn varchar(31), name varchar(31), primary key (id))",
-				"create table book_reviewer (author_id int not null, book_id int not null, primary key (author_id, book_id))",
+				"create table book_reviewer (person_id int not null, book_id int not null, primary key (person_id, book_id))",
 				"create table quote (book_id bigint, id int not null, text varchar(127), primary key (id))")
 				.forEach(jdbcTemplate::update);
 
 		logger.info("Inserting data...");
 		int idPerson = 1;
-		Person person1 = authorRepository.save(new Person(idPerson++, "Stephen Kink"));
+		Person person1 = authorRepository.save(new Person(idPerson++, "Stephen King"));
 		Person person2 = authorRepository.save(new Person(idPerson++, "Not Fradantim, he does not read"));
 		Person person3 = authorRepository.save(new Person(idPerson++, "Geprge Orwell"));
 		Person person4 = authorRepository.save(new Person(idPerson++, "Also not Fradantim"));

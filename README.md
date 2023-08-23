@@ -6,23 +6,34 @@ Simple proof of concept on using the attribute projection of graphql to reduce t
 
 ### The model
 ``` mermaid
-classDiagram
-class Book{
-    Integer id
-    String name
-    String isbn
+erDiagram
+book {
+  int id
+  string name
+  string isbn
+  int author_id
 }
-class Person{
-    Integer id
-    String name
+
+person {
+  int id
+  string name
 }
-class Quote{
-    Integer id
-    String text
+
+quote {
+  int id
+  int book_id
+  string text
 }
-Book o-- Person : author
-Book o-- "0..*" Person : reviewers
-Book --o Quote
+
+book_reviewer {
+  book_id
+  person_id
+}
+
+book ||--o{ book_reviewer : "reviewers"
+person ||--o{ book_reviewer : "reviews"
+person ||--o{ book : "author"
+book ||--o{ quote : ""
 ```
 
 ### Data query
@@ -62,7 +73,7 @@ Response:
       "id": "1",
       "name": "IT",
       "isbn": "9783453435773",
-      "author": { "id": "1", "name": "Stephen Kink" },
+      "author": { "id": "1", "name": "Stephen King" },
       "quotes": [
         { "id": "3", "text": "What can be done when you’re eleven can often never be done again." },
         { "id": "1", "text": "Your hair is winter fire, January embers, My heart burns there, too." },
