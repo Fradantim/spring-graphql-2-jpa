@@ -4,18 +4,24 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import org.hibernate.jpa.HibernatePersistenceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.orm.jpa.persistenceunit.MutablePersistenceUnitInfo;
 import org.springframework.stereotype.Service;
 
@@ -37,12 +43,17 @@ import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 
 	private static final Logger logger = LoggerFactory.getLogger(GraphQLDAOImpl.class);
+	private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+	private static final AtomicLong entityCounter = new AtomicLong(); // this is a nice metric to expose
+	private static final AtomicLong connectionCounter = new AtomicLong(); // this is a nice metric to expose
 
-	private final AtomicLong counter = new AtomicLong();
-	private final Map<String, Class<?>> cache = new ConcurrentHashMap<>();
+	private final Map<String, Class<?>> entityDefinitionCache = new ConcurrentHashMap<>();
 	private final MutablePersistenceUnitInfo persistenceUnitInfo;
 	private EntityManagerFactory emf = null;
 	private EntityManager entityManager = null;
+
+	@Value("${graphql-dao.connection.close-delay:PT4S}")
+	private Duration connectionCloseDelay;
 
 	public GraphQLDAOImpl(EntityManagerFactory otherEMF) {
 		persistenceUnitInfo = buildPersistenceUnitInfo(otherEMF.getProperties());
@@ -133,45 +144,49 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 
 	private Class<?> getMinimalClass(Class<?> modelClass, DataFetchingFieldSelectionSet dataSelectionSet,
 			Boolean firstEntry) {
+		OffsetDateTime start = OffsetDateTime.now();
 		String identifier = buildSelectionIdentifier(modelClass, dataSelectionSet);
 
-		Class<?> result = cache.get(identifier);
-		if (result != null)
-			return result;
+		Class<?> entityDefinition = entityDefinitionCache.get(identifier);
+		if (entityDefinition != null)
+			return entityDefinition;
 
 		String fullIdentifier = buildDeepSelectionIdentifier(modelClass, dataSelectionSet);
 		if (!fullIdentifier.equals(identifier)) {
-			result = cache.get(fullIdentifier);
-			if (result != null) {
+			entityDefinition = entityDefinitionCache.get(fullIdentifier);
+			if (entityDefinition != null) {
 				// new alias for same class
-				cache.put(identifier, result);
-				return result;
+				entityDefinitionCache.put(identifier, entityDefinition);
+				return entityDefinition;
 			}
 		}
 
 		synchronized (fullIdentifier) {
-			result = cache.get(fullIdentifier);
-			if (result != null)
-				return result;
+			entityDefinition = entityDefinitionCache.get(fullIdentifier);
+			if (entityDefinition != null) {
+				if (logger.isDebugEnabled())
+					logger.debug("Entity retrieved in {}", Duration.between(start, OffsetDateTime.now()));
+				return entityDefinition;
+			}
 
 			logger.info("Creating minimal class for {}", fullIdentifier);
-			result = buildMinimalClass(modelClass, dataSelectionSet);
-			logger.info("Created a minimal class as {}", result.getName());
+			entityDefinition = buildMinimalClass(modelClass, dataSelectionSet);
+			logger.info("Created a minimal class as {}", entityDefinition.getName());
 
-			cache.put(fullIdentifier, result);
+			entityDefinitionCache.put(fullIdentifier, entityDefinition);
 			if (!fullIdentifier.equals(identifier))
-				cache.put(identifier, result);
+				entityDefinitionCache.put(identifier, entityDefinition);
 			synchronized (this) {
-				persistenceUnitInfo.addManagedClassName(result.getName());
+				persistenceUnitInfo.addManagedClassName(entityDefinition.getName());
 			}
 			if (firstEntry)
-				refreshEntityManager();
+				refreshEntityManager(start);
 		}
-		return result;
+		return entityDefinition;
 	}
 
 	private Class<?> buildMinimalClass(Class<?> modelClass, DataFetchingFieldSelectionSet dataSelectionSet) {
-		String className = modelClass.getName() + "$copy" + counter.getAndIncrement();
+		String className = modelClass.getName() + "$copy" + entityCounter.getAndIncrement();
 		DynamicType.Builder<?> builder = new ByteBuddy().subclass(Object.class).name(className)
 				.annotateType(modelClass.getDeclaredAnnotations());
 
@@ -234,35 +249,39 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 		return field.getType();
 	}
 
-	private synchronized void refreshEntityManager() {
+	private synchronized void refreshEntityManager(OffsetDateTime start) {
 		EntityManagerFactory oldemf = emf;
 		if (oldemf != null) {
-			new Thread(() -> {
-				// kill previous emf after some time so it can complete current queries
-				try {
-					Thread.sleep(4000);
-				} catch (InterruptedException e) {
-					e.printStackTrace(); // no-op
-				}
-				logger.info("Closing previous EntityManagerFactory");
+			Long previousConnection = connectionCounter.get() - 1;
+			Runnable closeConnnectionRunnable = () -> {
+				logger.info("EntityManager and Factory #{} closed", previousConnection);
 				emf.close();
-			}).start();
+			};
+			executorService.schedule(closeConnnectionRunnable, connectionCloseDelay.toMillis(), TimeUnit.MILLISECONDS);
 		}
 
-		logger.info("Refreshing EntityManager");
+		logger.debug("Refreshing EntityManager");
 		emf = new HibernatePersistenceProvider().createContainerEntityManagerFactory(persistenceUnitInfo,
 				Collections.emptyMap());
 		entityManager = emf.createEntityManager();
+		// this duration may include entity creation time
+		logger.info("EntityManager and Factory #{} opened in {}", connectionCounter.incrementAndGet(),
+				Duration.between(start, OffsetDateTime.now()));
 	}
 
 	private EntityManager getEntityManager() {
 		if (entityManager != null && entityManager.isOpen())
 			return entityManager;
 
+		OffsetDateTime start = OffsetDateTime.now();
 		synchronized (this) {
-			if (entityManager != null && entityManager.isOpen())
+			if (entityManager != null && entityManager.isOpen()) {
+				if (logger.isDebugEnabled())
+					logger.debug("EntityManager retrieved in {}", Duration.between(start, OffsetDateTime.now()));
 				return entityManager;
-			refreshEntityManager();
+			}
+
+			refreshEntityManager(start);
 		}
 
 		return entityManager;

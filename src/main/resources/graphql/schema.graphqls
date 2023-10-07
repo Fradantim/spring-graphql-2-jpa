@@ -6,12 +6,12 @@ type Book {
     id: ID!
     name: String
     isbn: String
-    author: Author
-    reviewers: [Author]
+    author: Person
+    reviewers: [Person]
     quotes: [Quote]
 }
 
-type Author {
+type Person {
     id: ID!
     name: String!
 }

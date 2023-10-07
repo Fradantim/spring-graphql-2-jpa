@@ -1,0 +1,57 @@
+type Query {
+    findBookById(id: ID): Book
+    findExtendedBookById(id: ID): ExtendedBook
+}
+
+type Book {
+    id: ID!
+    name: String
+    isbn: String
+    author: Person
+    reviewers: [Person]
+    quotes: [Quote]
+}
+
+type Person {
+    id: ID!
+    name: String!
+}
+
+type Quote {
+    id: ID!
+    text: String
+}
+
+type ExtendedBook {
+    id: ID!
+    name: String
+    isbn: String
+    author: ExtendedPerson
+    reviewers: [ExtendedPerson]
+    quotes: [ExtendedQuote]
+    nonExistingColumnA: String
+    nonExistingColumnB: String
+    missingManyToOne: NonExistingEntity
+    missingOneToMany: [NonExistingEntity]
+    missingManyToMany: [NonExistingEntity]
+}
+
+type ExtendedPerson {
+    id: ID!
+    name: String!
+    nonExistingColumnA: String
+    nonExistingColumnB: String
+}
+
+type ExtendedQuote {
+    id: ID!
+    text: String
+    nonExistingColumnA: String
+    nonExistingColumnB: String
+}
+
+type NonExistingEntity {
+	id: ID!
+    nonExistingColumnA: String
+    nonExistingColumnB: String
+}
