@@ -5,6 +5,7 @@ import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.stereotype.Controller;
 
+import com.fradantim.graphql2jpa.annotation.ReturnType;
 import com.fradantim.graphql2jpa.dao.GraphQLDAO;
 import com.fradantim.graphql2jpa.entity.Book;
 
@@ -16,6 +17,7 @@ public class BookGraphQLController {
 	private GraphQLDAO graphQLDao;
 
 	@QueryMapping
+	@ReturnType(Book.class)
 	public Object findBookById(DataFetchingEnvironment env, @Argument Long id) {
 		return graphQLDao.find(Book.class, id, env.getSelectionSet(), true);
 	}
