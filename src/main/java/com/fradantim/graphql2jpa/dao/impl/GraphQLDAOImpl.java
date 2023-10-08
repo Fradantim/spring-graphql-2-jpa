@@ -252,10 +252,10 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 	private synchronized void refreshEntityManager(OffsetDateTime start) {
 		EntityManagerFactory oldemf = emf;
 		if (oldemf != null) {
-			Long previousConnection = connectionCounter.get() - 1;
+			Long previousConnection = connectionCounter.get();
 			Runnable closeConnnectionRunnable = () -> {
+				oldemf.close();
 				logger.info("EntityManager and Factory #{} closed", previousConnection);
-				emf.close();
 			};
 			executorService.schedule(closeConnnectionRunnable, connectionCloseDelay.toMillis(), TimeUnit.MILLISECONDS);
 		}
