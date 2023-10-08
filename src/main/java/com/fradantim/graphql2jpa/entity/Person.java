@@ -13,15 +13,6 @@ public class Person {
 	private String nonExistingColumnA;
 	private String nonExistingColumnB;
 
-	public Person() {
-	}
-
-	public Person(Integer id, String name) {
-		super();
-		this.id = id;
-		this.name = name;
-	}
-
 	public Integer getId() {
 		return id;
 	}

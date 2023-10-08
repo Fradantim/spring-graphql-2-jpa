@@ -51,9 +51,7 @@ public class GraphQLConfig {
 
 	@Bean
 	public GraphQlSourceBuilderCustomizer buildCustomizer(Resource graphQLSchema) {
-		return (GraphQlSource.SchemaResourceBuilder builder) -> {
-			builder.schemaResources(graphQLSchema);
-		};
+		return (GraphQlSource.SchemaResourceBuilder builder) -> builder.schemaResources(graphQLSchema);
 	}
 
 	@Bean

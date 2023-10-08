@@ -14,15 +14,6 @@ public class Quote {
 	private String nonExistingColumnA;
 	private String nonExistingColumnB;
 
-	public Quote() {
-	}
-
-	public Quote(Integer id, Integer bookId, String text) {
-		this.id = id;
-		this.bookId = bookId;
-		this.text = text;
-	}
-
 	public Integer getId() {
 		return id;
 	}

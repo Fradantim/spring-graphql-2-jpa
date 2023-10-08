@@ -56,22 +56,16 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 	private Duration connectionCloseDelay;
 
 	public GraphQLDAOImpl(EntityManagerFactory otherEMF) {
-		persistenceUnitInfo = buildPersistenceUnitInfo(otherEMF.getProperties());
-	}
-
-	private MutablePersistenceUnitInfo buildPersistenceUnitInfo(Map<String, Object> otherEMFProperties) {
-		MutablePersistenceUnitInfo persistenceUnitInfo = new MutablePersistenceUnitInfo() { // @ @formatter:off
+		persistenceUnitInfo = new MutablePersistenceUnitInfo() { // @ @formatter:off
 			@Override public ClassLoader getNewTempClassLoader() {return null;}
 			@Override public void addTransformer(ClassTransformer classTransformer) { /* no-op */ }
 		}; // @formatter:on
 
-		otherEMFProperties.entrySet().stream().filter(e -> e.getKey().startsWith("hibernate."))
-				.filter(e -> !"hibernate.transaction.coordinator_class".equals(e.getKey())).forEach(e -> {
-					persistenceUnitInfo.getProperties().put(e.getKey(), e.getValue());
-				});
+		otherEMF.getProperties().entrySet().stream().filter(e -> e.getKey().startsWith("hibernate."))
+				.filter(e -> !"hibernate.transaction.coordinator_class".equals(e.getKey()))
+				.forEach(e -> persistenceUnitInfo.getProperties().put(e.getKey(), e.getValue()));
 
 		persistenceUnitInfo.setPersistenceUnitName("DynamicPersistencUnitInfo");
-		return persistenceUnitInfo;
 	}
 
 	@Override
@@ -143,7 +137,7 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 	}
 
 	private Class<?> getMinimalClass(Class<?> modelClass, DataFetchingFieldSelectionSet dataSelectionSet,
-			Boolean firstEntry) {
+			boolean firstEntry) {
 		OffsetDateTime start = OffsetDateTime.now();
 		String identifier = buildSelectionIdentifier(modelClass, dataSelectionSet);
 
@@ -215,7 +209,7 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 			} else {
 				// entity
 				Type type = field.getGenericType();
-				if (type instanceof ParameterizedType ptype) {
+				if (type instanceof ParameterizedType) {
 					// generic
 					Class<?> entityModelClass = getRealFieldType(field);
 					Class<?> entityMinClass = getMinimalClass(entityModelClass, selectableField.get().getSelectionSet(),
@@ -233,7 +227,7 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 				}
 			}
 		} catch (SecurityException e) {
-			throw new RuntimeException(e);
+			throw new IllegalArgumentException(e);
 		}
 	}
 
@@ -242,7 +236,7 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 			try {
 				return Class.forName(ptype.getActualTypeArguments()[0].getTypeName());
 			} catch (ClassNotFoundException e) {
-				throw new RuntimeException(e);
+				throw new IllegalArgumentException(e);
 			}
 		}
 

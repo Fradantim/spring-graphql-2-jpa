@@ -37,17 +37,6 @@ public class Book {
 	@OneToMany(fetch = FetchType.EAGER)
 	private Set<NonExistingEntity> missingOneToMany;
 
-	public Book() {
-	}
-
-	public Book(Integer id, String name, String isbn, Person author) {
-		super();
-		this.id = id;
-		this.name = name;
-		this.isbn = isbn;
-		this.author = author;
-	}
-
 	public Integer getId() {
 		return id;
 	}
