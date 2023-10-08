@@ -10,6 +10,8 @@ public class Person {
 	@Id
 	private Integer id;
 	private String name;
+	private String nonExistingColumnA;
+	private String nonExistingColumnB;
 
 	public Person() {
 	}
@@ -34,5 +36,21 @@ public class Person {
 
 	public void setName(String name) {
 		this.name = name;
+	}
+
+	public String getNonExistingColumnA() {
+		return nonExistingColumnA;
+	}
+
+	public void setNonExistingColumnA(String nonExistingColumnA) {
+		this.nonExistingColumnA = nonExistingColumnA;
+	}
+
+	public String getNonExistingColumnB() {
+		return nonExistingColumnB;
+	}
+
+	public void setNonExistingColumnB(String nonExistingColumnB) {
+		this.nonExistingColumnB = nonExistingColumnB;
 	}
 }

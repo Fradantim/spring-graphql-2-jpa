@@ -19,7 +19,9 @@ public class Book {
 	private Integer id;
 	private String name;
 	private String isbn;
-
+	private String nonExistingColumnA;
+	private String nonExistingColumnB;
+	
 	@ManyToOne(fetch = FetchType.EAGER)
 	private Person author;
 
@@ -27,9 +29,13 @@ public class Book {
 	@OneToMany(fetch = FetchType.EAGER)
 	private Set<Quote> quotes;
 
-	@JoinTable(name = "book_reviewer", joinColumns = @JoinColumn(name = "person_id"), inverseJoinColumns = @JoinColumn(name = "book_id"))
+	@JoinTable(name = "book_reviewer", joinColumns = @JoinColumn(name = "book_id"), inverseJoinColumns = @JoinColumn(name = "person_id"))
 	@ManyToMany(fetch = FetchType.EAGER)
 	private Set<Person> reviewers;
+	
+	@JoinColumn(name = "nonExistingBookId")
+	@OneToMany(fetch = FetchType.EAGER)
+	private Set<NonExistingEntity> missingOneToMany;
 
 	public Book() {
 	}
@@ -66,6 +72,22 @@ public class Book {
 		this.isbn = isbn;
 	}
 
+	public String getNonExistingColumnA() {
+		return nonExistingColumnA;
+	}
+
+	public void setNonExistingColumnA(String nonExistingColumnA) {
+		this.nonExistingColumnA = nonExistingColumnA;
+	}
+
+	public String getNonExistingColumnB() {
+		return nonExistingColumnB;
+	}
+
+	public void setNonExistingColumnB(String nonExistingColumnB) {
+		this.nonExistingColumnB = nonExistingColumnB;
+	}
+
 	public Person getAuthor() {
 		return author;
 	}
@@ -88,5 +110,13 @@ public class Book {
 
 	public void setReviewers(Set<Person> reviewers) {
 		this.reviewers = reviewers;
+	}
+
+	public Set<NonExistingEntity> getMissingOneToMany() {
+		return missingOneToMany;
+	}
+
+	public void setMissingOneToMany(Set<NonExistingEntity> missingOneToMany) {
+		this.missingOneToMany = missingOneToMany;
 	}
 }

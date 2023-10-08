@@ -16,12 +16,12 @@ import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fradantim.graphql2jpa.entity.ExtendedBook;
-import com.fradantim.graphql2jpa.entity.ExtendedPerson;
-import com.fradantim.graphql2jpa.entity.ExtendedQuote;
+import com.fradantim.graphql2jpa.entity.Book;
+import com.fradantim.graphql2jpa.entity.Person;
+import com.fradantim.graphql2jpa.entity.Quote;
 
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-class ExtendedBookGraphQLControllerTests {
+class BookGraphQLControllerTests {
 
 	@Value("http://localhost:${local.server.port}")
 	private String localUrl;
@@ -34,10 +34,10 @@ class ExtendedBookGraphQLControllerTests {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Test
-	void queryExtendedBookTest() {
+	void queryBookTest() {
 		String queryValue = """
 				{
-					findExtendedBookById(id:1) {
+					findBookById(id:1) {
 						id name isbn
 						author {id name}
 						reviewers {id name}
@@ -57,13 +57,13 @@ class ExtendedBookGraphQLControllerTests {
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody()).isNotNull().containsKey("data");
 		assertThat(response.getBody().get("data")).isInstanceOf(Map.class);
-		assertThat((Map) response.getBody().get("data")).containsKey("findExtendedBookById");
-		assertThat((Map) ((Map) response.getBody().get("data")).get("findExtendedBookById")).isNotNull()
-				.isInstanceOf(Map.class).isNotEmpty();
+		assertThat((Map) response.getBody().get("data")).containsKey("findBookById");
+		assertThat((Map) ((Map) response.getBody().get("data")).get("findBookById")).isNotNull().isInstanceOf(Map.class)
+				.isNotEmpty();
 
-		Map<String, Object> result = (Map) ((Map) response.getBody().get("data")).get("findExtendedBookById");
+		Map<String, Object> result = (Map) ((Map) response.getBody().get("data")).get("findBookById");
 
-		ExtendedBook book = objectMapper.convertValue(result, ExtendedBook.class);
+		Book book = objectMapper.convertValue(result, Book.class);
 
 		assertThat(book.getId()).isNotNull();
 		assertThat(book.getName()).isNotNull();
@@ -73,14 +73,14 @@ class ExtendedBookGraphQLControllerTests {
 		assertThat(book.getMissingOneToMany()).isNull();
 
 		assertThat(book.getAuthor()).isNotNull();
-		ExtendedPerson author = book.getAuthor();
+		Person author = book.getAuthor();
 		assertThat(author.getId()).isNotNull();
 		assertThat(author.getName()).isNotNull();
 		assertThat(author.getNonExistingColumnA()).isNull();
 		assertThat(author.getNonExistingColumnB()).isNull();
 
 		assertThat(book.getQuotes()).isNotNull().isNotEmpty();
-		for (ExtendedQuote quote : book.getQuotes()) {
+		for (Quote quote : book.getQuotes()) {
 			assertThat(quote.getId()).isNotNull();
 			assertThat(quote.getText()).isNotNull();
 			assertThat(quote.getNonExistingColumnA()).isNull();
@@ -88,7 +88,7 @@ class ExtendedBookGraphQLControllerTests {
 		}
 
 		assertThat(book.getReviewers()).isNotNull().isNotEmpty();
-		for (ExtendedPerson reviewer : book.getReviewers()) {
+		for (Person reviewer : book.getReviewers()) {
 			assertThat(reviewer.getId()).isNotNull();
 			assertThat(reviewer.getName()).isNotNull();
 			assertThat(reviewer.getNonExistingColumnA()).isNull();
