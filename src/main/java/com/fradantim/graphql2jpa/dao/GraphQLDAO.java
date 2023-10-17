@@ -1,5 +1,7 @@
 package com.fradantim.graphql2jpa.dao;
 
+import java.util.Optional;
+
 import graphql.schema.DataFetchingFieldSelectionSet;
 
 public interface GraphQLDAO {
@@ -11,6 +13,6 @@ public interface GraphQLDAO {
 	 *                         context
 	 * @return An entity instance from a reduced class based on <b>modelClass</b>
 	 */
-	public Object find(Class<?> modelClass, Object primaryKey, DataFetchingFieldSelectionSet dataSelectionSet,
+	public Optional<Object> find(Class<?> modelClass, Object primaryKey, DataFetchingFieldSelectionSet dataSelectionSet,
 			boolean evict);
 }

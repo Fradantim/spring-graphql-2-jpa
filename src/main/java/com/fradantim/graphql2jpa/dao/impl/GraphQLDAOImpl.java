@@ -69,14 +69,14 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 	}
 
 	@Override
-	public Object find(Class<?> modelClass, Object primaryKey, DataFetchingFieldSelectionSet dataSelectionSet,
+	public Optional<Object> find(Class<?> modelClass, Object primaryKey, DataFetchingFieldSelectionSet dataSelectionSet,
 			boolean evict) {
 		Class<?> minClass = getMinimalClass(modelClass, dataSelectionSet, true);
 		EntityManager em = getEntityManager();
 		Object res = em.find(minClass, primaryKey);
-		if (evict)
+		if (evict && res != null)
 			em.detach(res);
-		return res;
+		return Optional.ofNullable(res);
 	}
 
 	@Override
