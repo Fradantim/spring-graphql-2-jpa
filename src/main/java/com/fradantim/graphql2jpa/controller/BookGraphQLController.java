@@ -1,7 +1,5 @@
 package com.fradantim.graphql2jpa.controller;
 
-import java.util.Optional;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -34,9 +32,9 @@ public class BookGraphQLController extends DataFetcherExceptionResolverAdapter {
 			return GraphqlErrorBuilder.newError().errorType(ErrorType.NOT_FOUND)
 					.message("No book found for id " + bnf.id).path(env.getExecutionStepInfo().getPath())
 					.location(env.getField().getSourceLocation()).build();
-		} else {
-			return null;
 		}
+		return GraphqlErrorBuilder.newError().errorType(ErrorType.INTERNAL_ERROR).message(ex.getMessage())
+				.path(env.getExecutionStepInfo().getPath()).location(env.getField().getSourceLocation()).build();
 	}
 }
 
