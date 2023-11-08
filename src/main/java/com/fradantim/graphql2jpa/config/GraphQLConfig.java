@@ -83,7 +83,14 @@ public class GraphQLConfig {
 					else
 						returnType = method.getReturnType();
 
-					GraphQLOutputType type = buildOrGetReturnType(complexTypes, returnType);
+					GraphQLOutputType type;
+					if (Collection.class.isAssignableFrom(method.getReturnType())) {
+						type = buildOrGetReturnType(complexTypes, returnType);
+						type = GraphQLList.list(type);
+					} else {
+						type = buildOrGetReturnType(complexTypes, returnType);
+					}
+
 					List<GraphQLArgument> arguments = getArguments(method);
 
 					GraphQLFieldDefinition.Builder builder = GraphQLFieldDefinition.newFieldDefinition().name(queryName)
@@ -110,12 +117,24 @@ public class GraphQLConfig {
 		}).filter(Optional::isPresent).map(Optional::get).toList();
 	}
 
+	@SuppressWarnings("unchecked")
 	private Optional<GraphQLInputType> getParameterType(Parameter parameter, String name) {
 		if ("id".equals(name))
 			return Optional.of(Scalars.GraphQLID);
 
-		@SuppressWarnings("unchecked")
-		Optional<GraphQLInputType> type = (Optional<GraphQLInputType>) (Object) getBestScalar(parameter.getType());
+		if ("ids".equals(name))
+			return Optional.of(GraphQLList.list(Scalars.GraphQLID));
+
+		Optional<GraphQLInputType> type;
+		if (Collection.class.isAssignableFrom(parameter.getType())) {
+			Class<?> nonGenericType = (Class<?>) ((ParameterizedType) parameter.getParameterizedType())
+					.getActualTypeArguments()[0];
+
+			type = ((Optional<GraphQLInputType>) (Object) getBestScalar(nonGenericType));
+			type = type.map(GraphQLList::list);
+		} else {
+			type = (Optional<GraphQLInputType>) (Object) getBestScalar(parameter.getType());
+		}
 
 		if (type.isEmpty())
 			logger.warn("No matching graphql type for parameter {} with type {}", name, type);

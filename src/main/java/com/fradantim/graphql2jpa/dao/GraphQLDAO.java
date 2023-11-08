@@ -1,5 +1,6 @@
 package com.fradantim.graphql2jpa.dao;
 
+import java.util.List;
 import java.util.Optional;
 
 import graphql.schema.DataFetchingFieldSelectionSet;
@@ -15,4 +16,7 @@ public interface GraphQLDAO {
 	 */
 	public Optional<Object> find(Class<?> modelClass, Object primaryKey, DataFetchingFieldSelectionSet dataSelectionSet,
 			boolean evict);
+	
+	public List<Object> find(Class<?> modelClass, List<? extends Object> primaryKeys,
+			DataFetchingFieldSelectionSet dataSelectionSet, boolean evict);
 }

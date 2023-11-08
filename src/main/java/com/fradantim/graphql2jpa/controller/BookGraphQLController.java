@@ -1,5 +1,7 @@
 package com.fradantim.graphql2jpa.controller;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -22,8 +24,14 @@ public class BookGraphQLController extends DataFetcherExceptionResolverAdapter {
 
 	@QueryMapping
 	@ReturnType(Book.class)
-	public Object findBookById(DataFetchingEnvironment env, @Argument Long id) {
+	public Object findBookById(DataFetchingEnvironment env, @Argument Integer id) {
 		return graphQLDao.find(Book.class, id, env.getSelectionSet(), true).orElseThrow(() -> new BookNotFound(id));
+	}
+
+	@QueryMapping
+	@ReturnType(Book.class)
+	public List<Object> findBookByIds(DataFetchingEnvironment env, @Argument List<Integer> ids) {
+		return graphQLDao.find(Book.class, ids, env.getSelectionSet(), isThreadLocalContextAware());
 	}
 
 	@Override
@@ -42,9 +50,9 @@ class BookNotFound extends RuntimeException {
 
 	private static final long serialVersionUID = -5222064011257511675L;
 
-	public final Long id;
+	public final Integer id;
 
-	public BookNotFound(Long id) {
+	public BookNotFound(Integer id) {
 		this.id = id;
 	}
 }

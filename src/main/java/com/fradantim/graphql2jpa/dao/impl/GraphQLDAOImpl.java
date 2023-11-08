@@ -68,6 +68,21 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 		persistenceUnitInfo.setPersistenceUnitName("DynamicPersistencUnitInfo");
 	}
 
+	@SuppressWarnings("unchecked")
+	public List<Object> find(Class<?> modelClass, List<? extends Object> primaryKeys,
+			DataFetchingFieldSelectionSet dataSelectionSet, boolean evict) {
+		Class<?> minClass = getMinimalClass(modelClass, dataSelectionSet, true);
+		EntityManager em = getEntityManager();
+
+		List<Object> res = em.createQuery("SELECT e FROM " + minClass.getSimpleName() + " e WHERE e.id IN :ids")
+				.setParameter("ids", primaryKeys).getResultList();
+		
+		if(res != null && evict)
+			res.forEach(em::detach);
+		
+		return res;
+	}
+
 	@Override
 	public Optional<Object> find(Class<?> modelClass, Object primaryKey, DataFetchingFieldSelectionSet dataSelectionSet,
 			boolean evict) {
