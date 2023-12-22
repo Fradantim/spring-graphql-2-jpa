@@ -2,10 +2,16 @@ package com.fradantim.graphql2jpa.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,6 +29,8 @@ import com.fradantim.graphql2jpa.entity.Quote;
 
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 class BookGraphQLControllerTests {
+
+	private static final Logger logger = LoggerFactory.getLogger(BookGraphQLControllerTests.class);
 
 	@Value("http://localhost:${local.server.port}")
 	private String localUrl;
@@ -108,7 +116,7 @@ class BookGraphQLControllerTests {
 			assertThat(reviewer).hasAllNullFieldsOrPropertiesExcept("id");
 		}
 	}
-	
+
 	@Test
 	void queryBookIdsAreIncludedTest() {
 		String queryValue = """
@@ -174,6 +182,99 @@ class BookGraphQLControllerTests {
 		@SuppressWarnings({ "rawtypes", "unchecked" })
 		Collection<Map<String, Object>> errors = (Collection) response.getBody().get("errors");
 		assertThat(errors).isNotEmpty();
+	}
+
+	@Test
+	void incrementConnections() {
+		String queryPrefix = "{ findBookById(id: 1) { ";
+		String querySuffix = " } }";
+
+		List<List<String>> bookAttributes = combinations(List.of("id", "isbn", "name"));
+		List<List<String>> personAttributes = combinations(List.of("id", "name"));
+		List<List<String>> quoteAttributes = combinations(List.of("id", "text", "bookId"));
+
+		List<List<String>> rootAttributes = combinations(List.of("self", "author", "reviewers", "quotes"));
+
+		rootAttributes.forEach(
+				ra -> bookAttributes.forEach(ba -> personAttributes.forEach(pa -> quoteAttributes.forEach(qa -> {
+					if (ra.isEmpty() || (ba.isEmpty() && pa.isEmpty() && qa.isEmpty()))
+						return;
+
+					String body = "";
+					if (ra.contains("self") && !ba.isEmpty()) {
+						body += ba.stream().collect(Collectors.joining(" "));
+					}
+					if (ra.contains("author") && !pa.isEmpty()) {
+						body += " author { " + pa.stream().collect(Collectors.joining(" ")) + " }";
+					}
+					if (ra.contains("reviewers") && !pa.isEmpty()) {
+						body += " reviewers { " + pa.stream().collect(Collectors.joining(" ")) + " }";
+					}
+					if (ra.contains("quotes") && !qa.isEmpty()) {
+						body += " quotes { " + qa.stream().collect(Collectors.joining(" ")) + " }";
+					}
+
+					if (!body.isBlank()) {
+						String query = queryPrefix + body + querySuffix;
+						logger.info("Query: {}", query);
+
+						Map<String, Object> requestBody = Map.of("query", query);
+						RequestEntity<Map<String, Object>> request = RequestEntity.post(localUrl + "/graphql")
+								.body(requestBody);
+
+						ResponseEntity<Map<String, Object>> response = restTemplate.exchange(request,
+								new ParameterizedTypeReference<>() {
+								});
+						assertThat(response.getBody()).doesNotContainKey("errors");
+						assertThat(response.getBody()).containsKey("data").extracting("data").isInstanceOf(Map.class)
+								.hasFieldOrProperty("findBookById").extracting("findBookById").isNotNull()
+								.isInstanceOf(Map.class);
+					}
+				}))));
+	}
+
+	private static <T> List<List<T>> combinations(List<T> iterable, int r) {
+		List<T> pool = new ArrayList<>(iterable);
+		int n = pool.size();
+		if (r > n)
+			return new ArrayList<>(); // empty list if r > n
+
+		List<List<T>> result = new ArrayList<>();
+		int[] indices = new int[r];
+		for (int i = 0; i < r; i++)
+			indices[i] = i;
+
+		while (true) {
+			List<T> combination = new ArrayList<>();
+			for (int i : indices)
+				combination.add(pool.get(i));
+			result.add(combination);
+
+			int i;
+			for (i = r - 1; i >= 0; i--)
+				if (indices[i] != i + n - r)
+					break;
+
+			if (i < 0)
+				break;
+
+			indices[i]++;
+			for (int j = i + 1; j < r; j++)
+				indices[j] = indices[j - 1] + 1;
+		}
+
+		return result;
+	}
+
+	/** From input [A,B,C] returns [[],[A],[B],[C],[A,B],[A,C],[B,C],[A,B,C]] */
+	private static <T> List<List<T>> combinations(List<T> ogList) {
+		List<List<T>> allCombinations = new ArrayList<>();
+
+		IntStream.range(0, ogList.size() + 1).forEach(i -> {
+			allCombinations.addAll(combinations(ogList, i));
+		});
+
+		return allCombinations;
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
