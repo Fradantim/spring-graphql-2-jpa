@@ -11,7 +11,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -27,7 +26,6 @@ import org.springframework.orm.jpa.persistenceunit.MutablePersistenceUnitInfo;
 import org.springframework.stereotype.Service;
 
 import com.fradantim.graphql2jpa.dao.GraphQLDAO;
-import com.zaxxer.hikari.HikariDataSource;
 
 import graphql.schema.DataFetchingFieldSelectionSet;
 import graphql.schema.SelectedField;
@@ -50,43 +48,24 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 	private static final AtomicLong connectionCounter = new AtomicLong(); // this is a nice metric to expose
 
 	private final Map<String, Class<?>> entityDefinitionCache = new ConcurrentHashMap<>();
-	private MutablePersistenceUnitInfo persistenceUnitInfo;
+	private final MutablePersistenceUnitInfo persistenceUnitInfo;
 	private EntityManagerFactory emf = null;
 	private EntityManager entityManager = null;
-	
-	private final EntityManagerFactory otherEMF;
 
 	@Value("${graphql-dao.connection.close-delay:PT4S}")
 	private Duration connectionCloseDelay;
 
 	public GraphQLDAOImpl(EntityManagerFactory otherEMF) {
-		this.otherEMF = otherEMF;
-		rebuildPersistenceUnitInfo();
-	}
-	
-	private void rebuildPersistenceUnitInfo() {
 		persistenceUnitInfo = new MutablePersistenceUnitInfo() { // @ @formatter:off
 			@Override public ClassLoader getNewTempClassLoader() {return null;}
 			@Override public void addTransformer(ClassTransformer classTransformer) { /* no-op */ }
 		}; // @formatter:on
 
-		Properties persitenceUnitInfoProps = persistenceUnitInfo.getProperties();
-		
 		otherEMF.getProperties().entrySet().stream().filter(e -> e.getKey().startsWith("hibernate."))
 				.filter(e -> !"hibernate.transaction.coordinator_class".equals(e.getKey()))
-				.forEach(e -> persitenceUnitInfoProps.put(e.getKey(), e.getValue()));
+				.forEach(e -> persistenceUnitInfo.getProperties().put(e.getKey(), e.getValue()));
 
-		persistenceUnitInfo.setPersistenceUnitName("DynamicPersistencUnitInfo"+connectionCounter.get());
-		
-		entityDefinitionCache.values()
-				.forEach(definition -> persistenceUnitInfo.addManagedClassName(definition.getName()));
-		
-		// keeping the same datasource wont allow me to get an 11th~ connection
-		HikariDataSource dataSource = (HikariDataSource) otherEMF.getProperties().get("jakarta.persistence.nonJtaDataSource");
-		HikariDataSource newDataSource = new HikariDataSource(dataSource);
-		
-		List.of("jakarta.persistence.nonJtaDataSource", "javax.persistence.nonJtaDataSource",
-				"hibernate.connection.datasource").forEach(k -> persitenceUnitInfoProps.put(k, newDataSource));
+		persistenceUnitInfo.setPersistenceUnitName("DynamicPersistencUnitInfo");
 	}
 
 	@SuppressWarnings("unchecked")
@@ -97,10 +76,10 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 
 		List<Object> res = em.createQuery("SELECT e FROM " + minClass.getSimpleName() + " e WHERE e.id IN :ids")
 				.setParameter("ids", primaryKeys).getResultList();
-		
-		if(res != null && evict)
+
+		if (res != null && evict)
 			res.forEach(em::detach);
-		
+
 		return res;
 	}
 
@@ -117,6 +96,8 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 
 	@Override
 	public void close() throws Exception {
+		if(entityManager != null)
+			entityManager.close();
 		if (emf != null)
 			emf.close();
 	}
@@ -206,6 +187,9 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 			entityDefinitionCache.put(fullIdentifier, entityDefinition);
 			if (!fullIdentifier.equals(identifier))
 				entityDefinitionCache.put(identifier, entityDefinition);
+			synchronized (this) {
+				persistenceUnitInfo.addManagedClassName(entityDefinition.getName());
+			}
 			if (firstEntry)
 				refreshEntityManager(start);
 		}
@@ -278,16 +262,22 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 
 	private synchronized void refreshEntityManager(OffsetDateTime start) {
 		EntityManagerFactory oldemf = emf;
-		if (oldemf != null) {
-			Long previousConnection = connectionCounter.get();
-			Runnable closeConnnectionRunnable = () -> {
-				oldemf.close();
-				logger.info("EntityManager and Factory #{} closed", previousConnection);
-			};
-			executorService.schedule(closeConnnectionRunnable, connectionCloseDelay.toMillis(), TimeUnit.MILLISECONDS);
-		}
+		EntityManager oldem = entityManager;
 
-		rebuildPersistenceUnitInfo();
+		Long previousConnection = connectionCounter.get();
+		Runnable closeConnnectionRunnable = () -> {
+			try {
+				oldem.close();
+			} catch (Exception e) {
+			}
+			try {
+				oldemf.close();
+			} catch (Exception e) {
+			}
+			logger.info("EntityManager and Factory #{} closed", previousConnection);
+		};
+		executorService.schedule(closeConnnectionRunnable, connectionCloseDelay.toMillis(), TimeUnit.MILLISECONDS);
+
 		logger.debug("Refreshing EntityManager");
 		emf = new HibernatePersistenceProvider().createContainerEntityManagerFactory(persistenceUnitInfo,
 				Collections.emptyMap());
