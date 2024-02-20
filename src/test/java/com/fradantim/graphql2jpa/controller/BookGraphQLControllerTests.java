@@ -183,6 +183,44 @@ class BookGraphQLControllerTests {
 		Collection<Map<String, Object>> errors = (Collection) response.getBody().get("errors");
 		assertThat(errors).isNotEmpty();
 	}
+	
+	@Test
+	void queryBookByPojoTest() {
+		String queryValue = """
+				{
+				  findBookByPojo(pojo:{id:1}) {
+				    	id
+						author {id}
+						quotes {id}
+						reviewers {id}
+				  }
+				}
+				""";
+
+		Map<String, Object> requestBody = Map.of("query", queryValue);
+		RequestEntity<Map<String, Object>> request = RequestEntity.post(localUrl + "/graphql").body(requestBody);
+
+		ResponseEntity<Map<String, Object>> response = restTemplate.exchange(request,
+				new ParameterizedTypeReference<>() {
+				});
+
+		Book book = getGraphQLQueryResult(response, "findBookByPojo", Book.class);
+
+		assertThat(book).hasAllNullFieldsOrPropertiesExcept("id", "author", "quotes", "reviewers");
+
+		Person author = book.getAuthor();
+		assertThat(author).hasAllNullFieldsOrPropertiesExcept("id");
+
+		assertThat(book.getQuotes()).hasSize(3);
+		for (Quote quote : book.getQuotes()) {
+			assertThat(quote).hasAllNullFieldsOrPropertiesExcept("id");
+		}
+
+		assertThat(book.getReviewers()).hasSize(2);
+		for (Person reviewer : book.getReviewers()) {
+			assertThat(reviewer).hasAllNullFieldsOrPropertiesExcept("id");
+		}
+	}
 
 	@Test
 	void incrementConnections() {

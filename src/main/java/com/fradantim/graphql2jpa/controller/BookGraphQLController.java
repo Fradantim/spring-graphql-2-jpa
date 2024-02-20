@@ -21,7 +21,7 @@ import graphql.schema.DataFetchingEnvironment;
 public class BookGraphQLController extends DataFetcherExceptionResolverAdapter {
 	@Autowired
 	private GraphQLDAO graphQLDao;
-
+	
 	@QueryMapping
 	@ReturnType(Book.class)
 	public Object findBookById(DataFetchingEnvironment env, @Argument Integer id) {
@@ -32,6 +32,12 @@ public class BookGraphQLController extends DataFetcherExceptionResolverAdapter {
 	@ReturnType(Book.class)
 	public List<Object> findBookByIds(DataFetchingEnvironment env, @Argument List<Integer> ids) {
 		return graphQLDao.find(Book.class, ids, env.getSelectionSet(), isThreadLocalContextAware());
+	}
+	
+	@QueryMapping
+	@ReturnType(Book.class)
+	public Object findBookByPojo(DataFetchingEnvironment env, @Argument Book pojo) {
+		return findBookById(env, pojo.getId());
 	}
 
 	@Override

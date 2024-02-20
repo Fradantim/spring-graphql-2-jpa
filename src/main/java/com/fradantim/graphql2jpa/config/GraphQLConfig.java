@@ -1,6 +1,7 @@
 package com.fradantim.graphql2jpa.config;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
@@ -35,13 +36,17 @@ import com.fradantim.graphql2jpa.annotation.ReturnType;
 import graphql.Scalars;
 import graphql.schema.GraphQLArgument;
 import graphql.schema.GraphQLFieldDefinition;
+import graphql.schema.GraphQLInputObjectField;
+import graphql.schema.GraphQLInputObjectType;
 import graphql.schema.GraphQLInputType;
 import graphql.schema.GraphQLList;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLScalarType;
 import graphql.schema.GraphQLSchema;
+import graphql.schema.GraphQLType;
 import graphql.schema.idl.SchemaPrinter;
+import jakarta.annotation.Nullable;
 import jakarta.persistence.Id;
 
 @Configuration
@@ -62,7 +67,7 @@ public class GraphQLConfig {
 	}
 
 	public GraphQLSchema generateSchema() {
-		Map<Class<?>, GraphQLObjectType> complexTypes = new HashMap<>();
+		ComplexTypes complexTypes = new ComplexTypes();
 		List<GraphQLFieldDefinition> queryFields = new ArrayList<>();
 
 		String pkgName = GraphQLConfig.class.getPackageName().substring(0,
@@ -85,13 +90,12 @@ public class GraphQLConfig {
 
 					GraphQLOutputType type;
 					if (Collection.class.isAssignableFrom(method.getReturnType())) {
-						type = buildOrGetReturnType(complexTypes, returnType);
-						type = GraphQLList.list(type);
+						type = GraphQLList.list(getOrBuildOutputType(complexTypes, returnType, null));
 					} else {
-						type = buildOrGetReturnType(complexTypes, returnType);
+						type = getOrBuildOutputType(complexTypes, returnType, null);
 					}
 
-					List<GraphQLArgument> arguments = getArguments(method);
+					List<GraphQLArgument> arguments = getArguments(complexTypes, method);
 
 					GraphQLFieldDefinition.Builder builder = GraphQLFieldDefinition.newFieldDefinition().name(queryName)
 							.type(type);
@@ -105,40 +109,24 @@ public class GraphQLConfig {
 		return GraphQLSchema.newSchema().query(builder).build();
 	}
 
-	private List<GraphQLArgument> getArguments(Method method) {
+	private List<GraphQLArgument> getArguments(ComplexTypes complexTypes, Method method) {
 		return Arrays.stream(method.getParameters()).filter(p -> p.getAnnotation(Argument.class) != null).map(p -> {
 			String name = p.getAnnotation(Argument.class).name();
 			if (name.isBlank())
 				name = p.getName();
 
-			String finalName = name;
-			return getParameterType(p, name)
-					.map(type -> GraphQLArgument.newArgument().name(finalName).type(type).build());
-		}).filter(Optional::isPresent).map(Optional::get).toList();
-	}
+			GraphQLInputType inputType;
+			if (Collection.class.isAssignableFrom(p.getType())) {
+				Class<?> nonGenericType = (Class<?>) ((ParameterizedType) p.getParameterizedType())
+						.getActualTypeArguments()[0];
 
-	@SuppressWarnings("unchecked")
-	private Optional<GraphQLInputType> getParameterType(Parameter parameter, String name) {
-		if ("id".equals(name))
-			return Optional.of(Scalars.GraphQLID);
+				inputType = GraphQLList.list(getOrBuildInputType(complexTypes, nonGenericType, Attribute.of(p)));
+			} else {
+				inputType = getOrBuildInputType(complexTypes, p.getType(), Attribute.of(p));
+			}
 
-		if ("ids".equals(name))
-			return Optional.of(GraphQLList.list(Scalars.GraphQLID));
-
-		Optional<GraphQLInputType> type;
-		if (Collection.class.isAssignableFrom(parameter.getType())) {
-			Class<?> nonGenericType = (Class<?>) ((ParameterizedType) parameter.getParameterizedType())
-					.getActualTypeArguments()[0];
-
-			type = ((Optional<GraphQLInputType>) (Object) getBestScalar(nonGenericType));
-			type = type.map(GraphQLList::list);
-		} else {
-			type = (Optional<GraphQLInputType>) (Object) getBestScalar(parameter.getType());
-		}
-
-		if (type.isEmpty())
-			logger.warn("No matching graphql type for parameter {} with type {}", name, type);
-		return type;
+			return GraphQLArgument.newArgument().name(name).type(inputType).build();
+		}).toList();
 	}
 
 	private Map<Class<?>, GraphQLScalarType> typetranslation = Map
@@ -157,36 +145,76 @@ public class GraphQLConfig {
 				.filter(Objects::nonNull).findFirst();
 	}
 
-	private GraphQLOutputType buildOrGetReturnType(Map<Class<?>, GraphQLObjectType> complexTypes, Class<?> type) {
-		if (complexTypes.containsKey(type))
-			return complexTypes.get(type);
+	private Optional<GraphQLScalarType> getBestScalar(Class<?> type, @Nullable Attribute attribute) {
+		return getBestScalar(type).map(scalar -> {
+			if (attribute != null && ("id".equals(attribute.getName()) || "ids".equals(attribute.getName())
+					|| attribute.getName().endsWith("Id") || attribute.getName().endsWith("Ids")
+					|| attribute.getAnnotation(Id.class) != null))
+				return Scalars.GraphQLID;
+			return scalar;
+		});
+	}
 
-		Optional<GraphQLScalarType> scalar = getBestScalar(type);
+	private GraphQLOutputType getOrBuildOutputType(ComplexTypes complexTypes, Class<?> type,
+			@Nullable Attribute attribute) {
+		Optional<GraphQLOutputType> complexTypeOpt = complexTypes.getOutputType(type);
+		if (complexTypeOpt.isPresent())
+			return complexTypeOpt.get();
+
+		Optional<GraphQLScalarType> scalar = getBestScalar(type, attribute);
 		if (scalar.isPresent())
 			return scalar.get();
 
 		List<GraphQLFieldDefinition> fieldsDefinitions = Arrays.stream(type.getDeclaredFields()).map(f -> {
 			GraphQLOutputType fieldType;
-			if ("id".equals(f.getName()) || f.getAnnotation(Id.class) != null)
-				fieldType = Scalars.GraphQLID;
-			else {
-				if (Collection.class.isAssignableFrom(f.getType())) {
-					Class<?> nonGenericType = (Class<?>) ((ParameterizedType) f.getGenericType())
-							.getActualTypeArguments()[0];
-					fieldType = buildOrGetReturnType(complexTypes, nonGenericType);
-					fieldType = GraphQLList.list(fieldType);
-				} else {
-					fieldType = buildOrGetReturnType(complexTypes, f.getType());
-				}
+			if (Collection.class.isAssignableFrom(f.getType())) {
+				Class<?> nonGenericType = (Class<?>) ((ParameterizedType) f.getGenericType())
+						.getActualTypeArguments()[0];
+				fieldType = GraphQLList.list(getOrBuildOutputType(complexTypes, nonGenericType, Attribute.of(f)));
+			} else {
+				fieldType = getOrBuildOutputType(complexTypes, f.getType(), Attribute.of(f));
 			}
-
 			return GraphQLFieldDefinition.newFieldDefinition().name(f.getName()).type(fieldType).build();
 		}).toList();
 
-		GraphQLObjectType.Builder builder = GraphQLObjectType.newObject().name(type.getSimpleName());
+		String name = complexTypes.nextAvailableName(type.getSimpleName());
+		GraphQLObjectType.Builder builder = GraphQLObjectType.newObject().name(name);
 		fieldsDefinitions.forEach(builder::field);
 		GraphQLObjectType complexType = builder.build();
-		complexTypes.put(type, complexType);
+		complexTypes.addOutputType(type, complexType);
+		return complexType;
+	}
+
+	private GraphQLInputType getOrBuildInputType(ComplexTypes complexTypes, Class<?> type,
+			@Nullable Attribute attribute) {
+		Optional<GraphQLInputType> complexTypeOpt = complexTypes.getInputType(type);
+		if (complexTypeOpt.isPresent())
+			return complexTypeOpt.get();
+
+		Optional<GraphQLScalarType> scalar = getBestScalar(type, attribute);
+		if (scalar.isPresent()) {
+			return scalar.get();
+		}
+
+		List<GraphQLInputObjectField> fieldsDefinitions = Arrays.stream(type.getDeclaredFields()).map(f -> {
+			GraphQLInputType fieldType;
+
+			if (Collection.class.isAssignableFrom(f.getType())) {
+				Class<?> nonGenericType = (Class<?>) ((ParameterizedType) f.getGenericType())
+						.getActualTypeArguments()[0];
+				fieldType = GraphQLList.list(getOrBuildInputType(complexTypes, nonGenericType, Attribute.of(f)));
+			} else {
+				fieldType = getOrBuildInputType(complexTypes, f.getType(), Attribute.of(f));
+			}
+
+			return GraphQLInputObjectField.newInputObjectField().name(f.getName()).type(fieldType).build();
+		}).toList();
+
+		String name = complexTypes.nextAvailableName(type.getSimpleName());
+		GraphQLInputObjectType.Builder builder = GraphQLInputObjectType.newInputObject().name(name);
+		fieldsDefinitions.forEach(builder::field);
+		GraphQLInputType complexType = builder.build();
+		complexTypes.addInputType(type, complexType);
 		return complexType;
 	}
 
@@ -208,4 +236,71 @@ public class GraphQLConfig {
 				.map(Annotation::annotationType).filter(c -> c.getName().startsWith("org.springframework.stereotype"))
 				.anyMatch(this::classIsComponentAnotated);
 	}
+}
+
+class ComplexTypes {
+	private Map<Class<?>, GraphQLInputType> inputTypes = new HashMap<>();
+	private Map<Class<?>, GraphQLOutputType> outputTypes = new HashMap<>();
+
+	private long getCount(String typeNamePrefix) {
+		return Stream.of(inputTypes, outputTypes).flatMap(m -> m.values().stream())
+				.filter(t -> hasNamePrefix(t, typeNamePrefix)).count();
+	}
+
+	private boolean hasNamePrefix(GraphQLType type, String prefix) {
+		String typeName;
+		if (type instanceof GraphQLInputObjectType o)
+			typeName = o.getName();
+		else if (type instanceof GraphQLObjectType o)
+			typeName = o.getName();
+		else
+			return false;
+
+		return typeName.equals(prefix) || typeName.startsWith(prefix + "_");
+	}
+
+	public Optional<GraphQLInputType> getInputType(Class<?> clazz) {
+		return Optional.ofNullable(inputTypes.get(clazz));
+	}
+
+	public Optional<GraphQLOutputType> getOutputType(Class<?> clazz) {
+		return Optional.ofNullable(outputTypes.get(clazz));
+	}
+
+	public String nextAvailableName(String typeName) {
+		long count = getCount(typeName);
+		return count == 0 ? typeName : typeName + "_" + (count + 1);
+	}
+
+	public void addInputType(Class<?> clazz, GraphQLInputType type) {
+		inputTypes.put(clazz, type);
+	}
+
+	public void addOutputType(Class<?> clazz, GraphQLOutputType type) {
+		outputTypes.put(clazz, type);
+	}
+}
+
+interface Attribute {
+	public String getName();
+
+	public <T extends Annotation> T getAnnotation(Class<T> annotationClass);
+
+	public static Attribute of(Field field) { // @formatter:off
+ 		return new Attribute() {
+			@Override public String getName() { return field.getName(); }
+			@Override public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+				return field.getAnnotation(annotationClass);
+			}
+		};
+	}// @formatter:on
+
+	public static Attribute of(Parameter parameter) { // @formatter:off
+ 		return new Attribute() {
+			@Override public String getName() { return parameter.getName(); }
+			@Override public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+				return parameter.getAnnotation(annotationClass);
+			}
+		};
+	}// @formatter:on
 }
