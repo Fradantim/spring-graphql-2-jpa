@@ -268,11 +268,11 @@ public class GraphQLDAOImpl implements GraphQLDAO, AutoCloseable {
 		Runnable closeConnnectionRunnable = () -> {
 			try {
 				oldem.close();
-			} catch (Exception e) {
+			} catch (Exception e) { // no-op
 			}
 			try {
 				oldemf.close();
-			} catch (Exception e) {
+			} catch (Exception e) { // no-op
 			}
 			logger.info("EntityManager and Factory #{} closed", previousConnection);
 		};
