@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fradantim.graphql2jpa.entity.Book;
 import com.fradantim.graphql2jpa.entity.Person;
 import com.fradantim.graphql2jpa.entity.Quote;
+import com.fradantim.graphql2jpa.model.Cover;
 
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 class BookGraphQLControllerTests {
@@ -270,6 +271,25 @@ class BookGraphQLControllerTests {
 					}
 				}))));
 	}
+	
+	@Test
+	void enumTest() {
+		String queryValue = """
+				{
+				  echoCover(cover: HARD)
+				}
+				""";
+
+		Map<String, Object> requestBody = Map.of("query", queryValue);
+		RequestEntity<Map<String, Object>> request = RequestEntity.post(localUrl + "/graphql").body(requestBody);
+
+		ResponseEntity<Map<String, Object>> response = restTemplate.exchange(request,
+				new ParameterizedTypeReference<>() {
+				});
+
+		Cover cover = getGraphQLQueryResult(response, "echoCover", Cover.class);
+		assertThat(cover).isEqualTo(Cover.HARD);
+	}
 
 	private static <T> List<List<T>> combinations(List<T> iterable, int r) {
 		List<T> pool = new ArrayList<>(iterable);
@@ -321,10 +341,7 @@ class BookGraphQLControllerTests {
 		assertThat(response.getBody()).isNotNull().containsKey("data").extracting(m -> m.get("data"))
 				.isInstanceOf(Map.class);
 		Map<String, Object> data = (Map) response.getBody().get("data");
-		assertThat(data).containsKey(query).extracting(m -> m.get(query)).isInstanceOf(Map.class);
-		Map<String, Object> findBookById = (Map) data.get(query);
-		assertThat(findBookById).isNotNull().isNotEmpty();
-
-		return objectMapper.convertValue(findBookById, type);
+		assertThat(data).containsKey(query).extracting(m -> m.get(query)).isNotNull();
+		return objectMapper.convertValue(data.get(query), type);
 	}
 }
