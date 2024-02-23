@@ -157,11 +157,29 @@ public class GraphQLConfig {
 		});
 	}
 
+	@SuppressWarnings("rawtypes")
+	private GraphQLEnumType getOrBuildEnumType(ComplexTypes complexTypes, Class<?> type) {
+		return complexTypes.getEnumType(type).orElseGet(() -> {
+			String name = complexTypes.nextAvailableName(type.getSimpleName());
+			GraphQLEnumType.Builder builder = GraphQLEnumType.newEnum().name(name);
+			for (Object obj : type.getEnumConstants())
+				builder.value(((Enum) obj).name());
+
+			GraphQLEnumType enumType = builder.build();
+			complexTypes.addEnumType(type, enumType);
+
+			return enumType;
+		});
+	}
+
 	private GraphQLOutputType getOrBuildOutputType(ComplexTypes complexTypes, Class<?> type,
 			@Nullable Attribute attribute) {
 		Optional<GraphQLOutputType> complexTypeOpt = complexTypes.getOutputType(type);
 		if (complexTypeOpt.isPresent())
 			return complexTypeOpt.get();
+
+		if (type.isEnum())
+			return getOrBuildEnumType(complexTypes, type);
 
 		Optional<GraphQLScalarType> scalar = getBestScalar(type, attribute);
 		if (scalar.isPresent())
@@ -192,6 +210,9 @@ public class GraphQLConfig {
 		Optional<GraphQLInputType> complexTypeOpt = complexTypes.getInputType(type);
 		if (complexTypeOpt.isPresent())
 			return complexTypeOpt.get();
+
+		if (type.isEnum())
+			return getOrBuildEnumType(complexTypes, type);
 
 		Optional<GraphQLScalarType> scalar = getBestScalar(type, attribute);
 		if (scalar.isPresent()) {
@@ -258,6 +279,10 @@ class ComplexTypes {
 		return false;
 	}
 
+	public Optional<GraphQLEnumType> getEnumType(Class<?> clazz) {
+		return Optional.ofNullable(enumTypes.get(clazz));
+	}
+
 	public Optional<GraphQLInputType> getInputType(Class<?> clazz) {
 		return Optional.ofNullable(inputTypes.get(clazz));
 	}
@@ -269,6 +294,10 @@ class ComplexTypes {
 	public String nextAvailableName(String typeName) {
 		long count = getCount(typeName);
 		return count == 0 ? typeName : typeName + "_" + (count + 1);
+	}
+
+	public void addEnumType(Class<?> clazz, GraphQLEnumType type) {
+		enumTypes.put(clazz, type);
 	}
 
 	public void addInputType(Class<?> clazz, GraphQLInputType type) {

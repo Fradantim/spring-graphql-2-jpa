@@ -12,6 +12,7 @@ import org.springframework.stereotype.Controller;
 import com.fradantim.graphql2jpa.annotation.ReturnType;
 import com.fradantim.graphql2jpa.dao.GraphQLDAO;
 import com.fradantim.graphql2jpa.entity.Book;
+import com.fradantim.graphql2jpa.model.Cover;
 
 import graphql.GraphQLError;
 import graphql.GraphqlErrorBuilder;
@@ -38,6 +39,11 @@ public class BookGraphQLController extends DataFetcherExceptionResolverAdapter {
 	@ReturnType(Book.class)
 	public Object findBookByPojo(DataFetchingEnvironment env, @Argument Book pojo) {
 		return findBookById(env, pojo.getId());
+	}
+	
+	@QueryMapping
+	public Cover echoCover(@Argument Cover cover) {
+		return cover;
 	}
 
 	@Override
