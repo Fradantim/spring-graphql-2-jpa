@@ -35,11 +35,13 @@ import com.fradantim.graphql2jpa.annotation.ReturnType;
 
 import graphql.Scalars;
 import graphql.schema.GraphQLArgument;
+import graphql.schema.GraphQLEnumType;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLInputObjectField;
 import graphql.schema.GraphQLInputObjectType;
 import graphql.schema.GraphQLInputType;
 import graphql.schema.GraphQLList;
+import graphql.schema.GraphQLNamedSchemaElement;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLScalarType;
@@ -239,24 +241,21 @@ public class GraphQLConfig {
 }
 
 class ComplexTypes {
+	private Map<Class<?>, GraphQLEnumType> enumTypes = new HashMap<>();
 	private Map<Class<?>, GraphQLInputType> inputTypes = new HashMap<>();
 	private Map<Class<?>, GraphQLOutputType> outputTypes = new HashMap<>();
 
 	private long getCount(String typeNamePrefix) {
-		return Stream.of(inputTypes, outputTypes).flatMap(m -> m.values().stream())
+		return Stream.of(enumTypes, inputTypes, outputTypes).flatMap(m -> m.values().stream())
 				.filter(t -> hasNamePrefix(t, typeNamePrefix)).count();
 	}
 
 	private boolean hasNamePrefix(GraphQLType type, String prefix) {
-		String typeName;
-		if (type instanceof GraphQLInputObjectType o)
-			typeName = o.getName();
-		else if (type instanceof GraphQLObjectType o)
-			typeName = o.getName();
-		else
-			return false;
-
-		return typeName.equals(prefix) || typeName.startsWith(prefix + "_");
+		if (type instanceof GraphQLNamedSchemaElement o) {
+			String typeName = o.getName();
+			return typeName.equals(prefix) || typeName.startsWith(prefix + "_");
+		}
+		return false;
 	}
 
 	public Optional<GraphQLInputType> getInputType(Class<?> clazz) {
