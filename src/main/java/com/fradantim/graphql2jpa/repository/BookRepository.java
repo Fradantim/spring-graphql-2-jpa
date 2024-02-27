@@ -11,6 +11,7 @@ import com.fradantim.graphql2jpa.utils.GraphQLEntityFetchTranslator;
 
 import graphql.schema.DataFetchingFieldSelectionSet;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
 
 public interface BookRepository extends JpaRepository<Book, Integer>, CustomizedBookRepository {
 }
@@ -33,10 +34,13 @@ class CustomizedBookRepositoryImpl implements CustomizedBookRepository {
 	@Override
 	public Optional<Book> findById(Integer id, DataFetchingFieldSelectionSet dataSelectionSet) {
 		String fetch = GraphQLEntityFetchTranslator.buildFetch("b", dataSelectionSet);
-		Book book = entityManager.createQuery("Select b from Book b " + fetch + " where b.id = :id", Book.class)
-				.setParameter("id", id).getSingleResult();
-
-		return Optional.ofNullable(book);
+		try {
+			Book book = entityManager.createQuery("Select b from Book b " + fetch + " where b.id = :id", Book.class)
+					.setParameter("id", id).getSingleResult();
+			return Optional.of(book);
+		} catch (NoResultException e) {
+			return Optional.empty();
+		}
 	}
 
 	@Override
