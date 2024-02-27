@@ -11,8 +11,6 @@ public class Quote {
 	private Integer id;
 	private Integer bookId;
 	private String text;
-	private String nonExistingColumnA;
-	private String nonExistingColumnB;
 
 	public Integer getId() {
 		return id;
@@ -36,21 +34,5 @@ public class Quote {
 
 	public void setText(String text) {
 		this.text = text;
-	}
-
-	public String getNonExistingColumnA() {
-		return nonExistingColumnA;
-	}
-
-	public void setNonExistingColumnA(String nonExistingColumnA) {
-		this.nonExistingColumnA = nonExistingColumnA;
-	}
-
-	public String getNonExistingColumnB() {
-		return nonExistingColumnB;
-	}
-
-	public void setNonExistingColumnB(String nonExistingColumnB) {
-		this.nonExistingColumnB = nonExistingColumnB;
 	}
 }

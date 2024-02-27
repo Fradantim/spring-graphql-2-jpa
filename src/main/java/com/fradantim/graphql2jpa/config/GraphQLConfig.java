@@ -31,8 +31,6 @@ import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.execution.GraphQlSource;
 import org.springframework.stereotype.Component;
 
-import com.fradantim.graphql2jpa.annotation.ReturnType;
-
 import graphql.Scalars;
 import graphql.schema.GraphQLArgument;
 import graphql.schema.GraphQLEnumType;
@@ -83,15 +81,11 @@ public class GraphQLConfig {
 					if (queryName.isBlank())
 						queryName = method.getName();
 
-					Class<?> returnType;
-					ReturnType rt = method.getAnnotation(ReturnType.class);
-					if (rt != null)
-						returnType = rt.value();
-					else
-						returnType = method.getReturnType();
-
 					GraphQLOutputType type;
-					if (Collection.class.isAssignableFrom(method.getReturnType())) {
+					Class<?> returnType = method.getReturnType();
+					if (Collection.class.isAssignableFrom(returnType)) {
+						returnType = (Class<?>) ((ParameterizedType) method.getGenericReturnType())
+								.getActualTypeArguments()[0];
 						type = GraphQLList.list(getOrBuildOutputType(complexTypes, returnType, null));
 					} else {
 						type = getOrBuildOutputType(complexTypes, returnType, null);

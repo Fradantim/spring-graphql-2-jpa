@@ -24,14 +24,18 @@ public class GraphQL2JPAApplication implements CommandLineRunner {
 	@Override
 	public void run(String... args) throws Exception {
 		logger.info("Filling database...");
-		List.of("create table person (id int not null, name varchar(31), primary key (id))",
+		List.of("create table country (id int not null, name varchar(31), primary key (id))",
+				"create table person (id int not null, name varchar(31), country_id int, primary key (id))",
 				"create table book (author_id bigint, id int not null, isbn varchar(31), name varchar(31), primary key (id))",
 				"create table book_reviewer (person_id int not null, book_id int not null, primary key (person_id, book_id))",
 				"create table quote (book_id bigint, id int not null, text varchar(127), primary key (id))",
-				"insert into person (id, name) values (1, 'Stephen King')",
-				"insert into person (id, name) values (2, 'Not Fradantim, he does not read')",
-				"insert into person (id, name) values (3, 'George Orwell')",
-				"insert into person (id, name) values (4, 'Also not Fradantim')",
+				"insert into country (id, name) values (1, 'U.S.')",
+				"insert into country (id, name) values (2, 'India')",
+				"insert into country (id, name) values (3, 'Argentina')",
+				"insert into person (id, name, country_id) values (1, 'Stephen King', 1)",
+				"insert into person (id, name, country_id) values (2, 'Not Fradantim, he does not read', 3)",
+				"insert into person (id, name, country_id) values (3, 'George Orwell', 2)",
+				"insert into person (id, name, country_id) values (4, 'Also not Fradantim', 3)",
 				"insert into book (id, name, isbn, author_id) values (1, 'IT', '9783453435773', 1)",
 				"insert into book (id, name, isbn, author_id) values (2, 'The Shinning', '9783785746042', 1)",
 				"insert into book (id, name, isbn, author_id) values (3, 'Carrie', '9780307348074', 1)",

@@ -1,20 +1,15 @@
 package com.fradantim.graphql2jpa.entity;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
-@Table(name = "person")
+@Table(name = "country")
 @Entity
-public class Person {
+public class Country {
 	@Id
 	private Integer id;
 	private String name;
-
-	@ManyToOne(fetch = FetchType.LAZY)
-	private Country country;
 
 	public Integer getId() {
 		return id;
@@ -30,13 +25,5 @@ public class Person {
 
 	public void setName(String name) {
 		this.name = name;
-	}
-
-	public Country getCountry() {
-		return country;
-	}
-
-	public void setCountry(Country country) {
-		this.country = country;
 	}
 }

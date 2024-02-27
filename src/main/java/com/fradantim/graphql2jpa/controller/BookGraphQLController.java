@@ -2,17 +2,15 @@ package com.fradantim.graphql2jpa.controller;
 
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.execution.DataFetcherExceptionResolverAdapter;
 import org.springframework.graphql.execution.ErrorType;
 import org.springframework.stereotype.Controller;
 
-import com.fradantim.graphql2jpa.annotation.ReturnType;
-import com.fradantim.graphql2jpa.dao.GraphQLDAO;
 import com.fradantim.graphql2jpa.entity.Book;
 import com.fradantim.graphql2jpa.model.Cover;
+import com.fradantim.graphql2jpa.repository.BookRepository;
 
 import graphql.GraphQLError;
 import graphql.GraphqlErrorBuilder;
@@ -20,27 +18,28 @@ import graphql.schema.DataFetchingEnvironment;
 
 @Controller
 public class BookGraphQLController extends DataFetcherExceptionResolverAdapter {
-	@Autowired
-	private GraphQLDAO graphQLDao;
-	
-	@QueryMapping
-	@ReturnType(Book.class)
-	public Object findBookById(DataFetchingEnvironment env, @Argument Integer id) {
-		return graphQLDao.find(Book.class, id, env.getSelectionSet(), true).orElseThrow(() -> new BookNotFound(id));
+
+	private final BookRepository bookRepository;
+
+	public BookGraphQLController(BookRepository bookRepository) {
+		this.bookRepository = bookRepository;
 	}
 
 	@QueryMapping
-	@ReturnType(Book.class)
-	public List<Object> findBookByIds(DataFetchingEnvironment env, @Argument List<Integer> ids) {
-		return graphQLDao.find(Book.class, ids, env.getSelectionSet(), isThreadLocalContextAware());
+	public Book findBookById(DataFetchingEnvironment env, @Argument Integer id) {
+		return bookRepository.findById(id, env.getSelectionSet()).orElseThrow(() -> new BookNotFound(id));
 	}
-	
+
 	@QueryMapping
-	@ReturnType(Book.class)
-	public Object findBookByPojo(DataFetchingEnvironment env, @Argument Book pojo) {
+	public List<Book> findBookByIds(DataFetchingEnvironment env, @Argument List<Integer> ids) {
+		return bookRepository.findByIdIn(ids, env.getSelectionSet());
+	}
+
+	@QueryMapping
+	public Book findBookByPojo(DataFetchingEnvironment env, @Argument Book pojo) {
 		return findBookById(env, pojo.getId());
 	}
-	
+
 	@QueryMapping
 	public Cover echoCover(@Argument Cover cover) {
 		return cover;

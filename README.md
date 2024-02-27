@@ -1,6 +1,6 @@
 # spring-graphql-2-jpa
 
-Simple proof of concept on using the attribute projection of graphql to reduce the columns selected by jpa.
+Simple proof of concept on using the attribute projection of graphql to reduce the entities fetched by jpa.
 
 ## An Example
 
@@ -17,6 +17,7 @@ book {
 person {
   int id
   string name
+  int country_id
 }
 
 quote {
@@ -30,39 +31,37 @@ book_reviewer {
   person_id
 }
 
+country {
+  int id
+  string name
+}
+
 book ||--o{ book_reviewer : "reviewers"
-person ||--o{ book_reviewer : "reviews"
+person ||--o{ book_reviewer : ""
 person ||--o{ book : "author"
+country ||--o{ person : ""
 book ||--o{ quote : ""
 ```
 
 ### Data query
 
 #### Selecting all fields
-Query:
+GraphQL Query:
 ```
 {
   findBookById(id:1) {
     id name isbn
-    author { id name }
+    author {
+      id name
+      country {id name}
+      }
     quotes { id text }
-    reviewers { id name }
+    reviewers {
+      id name
+      country {id name}
+    }
   }
 }
-```
-
-JPQL:
-``` sql
-select
-	c1_0.id,c1_0.isbn,c1_0.name,
-	a1_0.id,a1_0.name,
-	q1_0.book_id,q1_0.id,q1_0.text,
-	r1_0.person_id,r1_1.id,r1_1.name
-	from book c1_0
-	left join person a1_0 on a1_0.id=c1_0.author_id
-	left join quote q1_0 on c1_0.id=q1_0.book_id 
-	left join (book_reviewer r1_0 join person r1_1 on r1_1.id=r1_0.book_id) on c1_0.id=r1_0.person_id 
-	where c1_0.id=?
 ```
 
 Response:
@@ -73,23 +72,53 @@ Response:
       "id": "1",
       "name": "IT",
       "isbn": "9783453435773",
-      "author": { "id": "1", "name": "Stephen King" },
+      "author": {
+        "id": "1",
+        "name": "Stephen King",
+        "country": { "id": "1", "name": "U.S." }
+      },
       "quotes": [
+        { "id": "2", "text": "We all float down here!" },
         { "id": "3", "text": "What can be done when you’re eleven can often never be done again." },
-        { "id": "1", "text": "Your hair is winter fire, January embers, My heart burns there, too." },
-        { "id": "2", "text": "We all float down here!" }
+        { "id": "1", "text": "Your hair is winter fire, January embers, My heart burns there, too." }
       ],
       "reviewers": [
-        { "id": "2", "name": "Not Fradantim, he does not read" },
-        { "id": "4", "name": "Also not Fradantim" }
+        {
+          "id": "2",
+          "name": "Not Fradantim, he does not read", 
+          "country": { "id": "3", "name": "Argentina" }
+        },
+        {
+          "id": "4",
+          "name": "Also not Fradantim",
+          "country": { "id": "3", "name": "Argentina" }
+        }
       ]
     }
   }
 }
 ```
 
+Background query:
+``` sql
+select b1_0.id,b1_0.isbn,b1_0.name,
+  a1_0.id,a1_0.name,
+  c1_0.id,c1_0.name,
+  c2_0.id,c2_0.name,
+  q1_0.book_id,q1_0.id,q1_0.text,
+  r1_0.book_id,r1_1.id,r1_1.name
+from book b1_0 
+  left join person a1_0 on a1_0.id=b1_0.author_id 
+  left join country c1_0 on c1_0.id=a1_0.country_id 
+  left join quote q1_0 on b1_0.id=q1_0.book_id 
+  left join book_reviewer r1_0 on b1_0.id=r1_0.book_id 
+  left join person r1_1 on r1_1.id=r1_0.person_id 
+  left join country c2_0 on c2_0.id=r1_1.country_id 
+where b1_0.id=?
+```
+
 #### Selecting some fields
-Query:
+GraphQL Query:
 ```
 {
   findBookById(id:1) {
@@ -100,61 +129,74 @@ Query:
 }
 ```
 
-JPQL:
-``` sql
-select 
-	c1_0.id,c1_0.name,
-	q1_0.book_id,q1_0.id,
-	r1_0.person_id,r1_1.id,r1_1.name
-	from book c1_0 
-	left join quote q1_0 on c1_0.id=q1_0.book_id 
-	left join (book_reviewer r1_0 join person r1_1 on r1_1.id=r1_0.book_id) on c1_0.id=r1_0.person_id
-	where c1_0.id=?
-```
-
 Response:
 ``` json
 {
   "data": {
     "findBookById": {
       "name": "IT",
-      "quotes": [ { "id": "1" }, { "id": "3" }, { "id": "2" } ],
-      "reviewers": [ { "name": "Not Fradantim, he does not read" }, { "name": "Also not Fradantim" } ]
+      "quotes": [
+        { "id": "2" },
+        { "id": "3" },
+        { "id": "1" }
+      ],
+      "reviewers": [
+        { "name": "Also not Fradantim" },
+        { "name": "Not Fradantim, he does not read" }
+      ]
     }
   }
 }
 ```
 
-Hey, who asked for Book.id and Reviewer.id? There's the catch!
+Background query:
+``` sql
+select b1_0.id,b1_0.author_id,b1_0.isbn,b1_0.name,
+  q1_0.book_id,q1_0.id,q1_0.text,
+  r1_0.book_id,r1_1.id,r1_1.country_id,r1_1.name
+from book b1_0 
+  left join quote q1_0 on b1_0.id=q1_0.book_id 
+  left join book_reviewer r1_0 on b1_0.id=r1_0.book_id 
+  left join person r1_1 on r1_1.id=r1_0.person_id 
+where b1_0.id=?
+```
+
+As you can see the relationships `book -> author` or `reviewer -> country` where not included in the graphql query and thus where not included in the background query
 
 ## How?
 
-The backend will create a brand new class based on the selected fields, for example, if we have the class:
-``` java
-@Entity @Table("MyTable") public class MyEntity {
-	@Id private Long id;
-	private String firstName;
-	private String lastName;
-	// constructors, getters ands setters
+The backend will use the graphql projection to indicate fetchs:
+GraphQL Query:
+```
+{
+  findBookById(id:1) {
+    id name isbn
+    author {
+      id name
+      country {id name}
+      }
+    quotes { id text }
+    reviewers {
+      id name
+      country {id name}
+    }
+  }
 }
 ```
-and we only ask for lastName a new class will be created:
-``` java
-@Entity @Table("MyTable") public class MyEntity$copy0 {
-	@Id public Long id;
-	public String lastName;
-	// nothing else
-}
+
+JPQL:
+``` sql
+select b from Book b
+  left join fetch b.author a0
+  left join fetch a0.country c0
+  left join fetch b.quotes q0
+  left join fetch b.reviewers r0
+  left join fetch r0.country c1
+where b1.id = :id
 ```
 
-Why is the `@Id` annotated field kept? -> Because it's a mandatory field for an entity.
+## Previous attempt
 
-This class reduction is also done on transitive classes (`@OneToOne` / `@OneToMany` / `@ManyToOne` / `@ManyToMany`), if they are selected on the request.
-
-This way the `EntityManager` can reduce the selected columns when performing a query.
-
-## The bad thing
-
-Each time a new class is created some computation time is lost performing reflection on the original class, and previous `EntityManager` and `EntityManagerFactory` need to be rebuilt, which can mean **creating a new jdbc connection**. Some measures are taken, like caching the classes, or reduce how often the `EntityManager` and `EntityManagerFactory` are rebuilt. Still this solution is not production ready, and may not work for every use case, but hey, that's a poc for you.
+There's [a previous attempt](/../../tree/best-projection-worst-conn-mgmt) which also manages to select fewer columns in the database query, but need to create new connections to the database at runtime.
 
 -F

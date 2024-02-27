@@ -19,22 +19,20 @@ public class Book {
 	private Integer id;
 	private String name;
 	private String isbn;
-	private String nonExistingColumnA;
-	private String nonExistingColumnB;
-	
-	@ManyToOne(fetch = FetchType.EAGER)
+
+	@ManyToOne(fetch = FetchType.LAZY)
 	private Person author;
 
 	@JoinColumn(name = "bookId")
-	@OneToMany(fetch = FetchType.EAGER)
+	@OneToMany(fetch = FetchType.LAZY)
 	private Set<Quote> quotes;
 
 	@JoinTable(name = "book_reviewer", joinColumns = @JoinColumn(name = "book_id"), inverseJoinColumns = @JoinColumn(name = "person_id"))
-	@ManyToMany(fetch = FetchType.EAGER)
+	@ManyToMany(fetch = FetchType.LAZY)
 	private Set<Person> reviewers;
-	
+
 	@JoinColumn(name = "nonExistingBookId")
-	@OneToMany(fetch = FetchType.EAGER)
+	@OneToMany(fetch = FetchType.LAZY)
 	private Set<NonExistingEntity> missingOneToMany;
 
 	public Integer getId() {
@@ -59,22 +57,6 @@ public class Book {
 
 	public void setIsbn(String isbn) {
 		this.isbn = isbn;
-	}
-
-	public String getNonExistingColumnA() {
-		return nonExistingColumnA;
-	}
-
-	public void setNonExistingColumnA(String nonExistingColumnA) {
-		this.nonExistingColumnA = nonExistingColumnA;
-	}
-
-	public String getNonExistingColumnB() {
-		return nonExistingColumnB;
-	}
-
-	public void setNonExistingColumnB(String nonExistingColumnB) {
-		this.nonExistingColumnB = nonExistingColumnB;
 	}
 
 	public Person getAuthor() {
