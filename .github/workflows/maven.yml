@@ -37,7 +37,7 @@ jobs:
         retention-days: 1
     - uses: marvinpinto/action-automatic-releases@latest
       with:
-        repo_token: "${{ secrets.YOUR-GITHUB-TOKEN }}"
+        repo_token: "${{ secrets.ACTION_TOKEN }}"
         automatic_release_tag: "${{ github.run_number }}"
         title: "Automated Build ${{ github.run_number }}"
         prerelease: true
