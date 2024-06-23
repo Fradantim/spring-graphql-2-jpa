@@ -2,6 +2,8 @@
 
 Simple proof of concept on using the attribute projection of graphql to reduce the entities fetched by jpa.
 
+[![Java CI with Maven](https://github.com/Fradantim/spring-graphql-2-jpa/actions/workflows/maven.yml/badge.svg)](https://github.com/Fradantim/spring-graphql-2-jpa/actions/workflows/maven.yml)
+
 ## An Example
 
 ### The model
