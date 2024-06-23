@@ -61,7 +61,13 @@ public class GraphQL2JPAApplication implements CommandLineRunner {
 				"insert into book_reviewer (book_id, person_id) values (2,4)",
 				"insert into book_reviewer (book_id, person_id) values (3,2)",
 				"insert into book_reviewer (book_id, person_id) values (3,4)",
-				"insert into book_reviewer (book_id, person_id) values (5,2)").forEach(jdbcTemplate::update);
+				"insert into book_reviewer (book_id, person_id) values (5,2)").forEach(s -> {
+					try {
+						jdbcTemplate.update(s);
+					} catch (Exception e) {
+						// no op
+					}
+				});
 		logger.info("Done.");
 	}
 }
